@@ -9,9 +9,9 @@
 [![macOS 13+](https://img.shields.io/badge/macOS-13%2B-000000?logo=apple)](https://www.apple.com/macos/)
 [![License: MIT](https://img.shields.io/github/license/yagcioglutoprak/dusty)](LICENSE)
 
-<img src="docs/screenshots/panel.png" width="420" alt="Dusty menu bar panel">
+<img src="docs/screenshots/demo.gif" width="480" alt="Dusty scanning and revealing reclaimable disk space across Safe, Developer, and Deep levels">
 
-<sub>10 GB free out of 494 GB, and 28.84 GB sitting in caches waiting to be reclaimed.</sub>
+<sub>One scan, and the gigabytes hiding in caches and developer junk are laid out by size.</sub>
 
 </div>
 
