@@ -11,7 +11,10 @@ public enum SafetyError: Error, Equatable, Sendable {
 }
 
 /// Enforces the allowlist model and safety rules. All deletion paths must pass validation here.
-public struct SafetyValidator: Sendable {
+///
+/// `@unchecked Sendable`: all stored state is immutable (`let`); the only reference type is
+/// `FileManager`, used for delegate-free, concurrency-safe queries, so it is safe to share.
+public struct SafetyValidator: @unchecked Sendable {
     private let fileManager: FileManager
     private let homeDirectory: URL
     private let bootVolumeURL: URL

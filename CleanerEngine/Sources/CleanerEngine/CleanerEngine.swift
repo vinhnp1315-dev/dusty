@@ -1,6 +1,10 @@
 import Foundation
 
 /// Pure cleanup engine: no SwiftUI dependencies. Fully unit-testable.
+///
+/// `@unchecked Sendable`: every stored dependency is immutable (`let`) and itself thread-safe.
+/// The only reference type reachable is `FileManager`, used solely for delegate-free, concurrency-safe
+/// queries (existence checks, attributes, enumeration), so the engine is safe to share across scan tasks.
 public final class CleanerEngine: @unchecked Sendable {
     private let fileManager: FileManager
     private let validator: SafetyValidator
@@ -99,7 +103,7 @@ public final class CleanerEngine: @unchecked Sendable {
             let bytes = estimateDockerReclaimable()
             resolvedPaths.append(ResolvedPath(
                 path: "docker:system prune",
-                displayName: "All unused images, build cache & anonymous volumes",
+                displayName: "All unused images, build cache & stopped containers",
                 targetID: target.id,
                 estimatedBytes: bytes,
                 isSelected: false
@@ -348,11 +352,15 @@ public final class CleanerEngine: @unchecked Sendable {
     // MARK: - Undo (Safe-level trash window)
 
     /// Move trashed items back to their original locations. Returns the count restored.
+    ///
+    /// Only entries whose `trashedPath` resolves inside the user's Trash are acted on, so a
+    /// caller cannot use this to move arbitrary files around. The move source must exist in
+    /// the Trash; if the original location is occupied the move fails and that entry is skipped.
     @discardableResult
     public func restore(_ entries: [DeletionEntry]) -> Int {
         var restored = 0
         for entry in entries {
-            guard let trashed = entry.trashedPath else { continue }
+            guard let trashed = entry.trashedPath, isInsideTrash(trashed) else { continue }
             let dest = URL(fileURLWithPath: entry.path)
             try? fileManager.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
             if (try? fileManager.moveItem(at: URL(fileURLWithPath: trashed), to: dest)) != nil {
@@ -363,11 +371,27 @@ public final class CleanerEngine: @unchecked Sendable {
     }
 
     /// Permanently remove trashed items (reclaims space once the undo window closes).
-    public func purge(_ entries: [DeletionEntry]) {
+    ///
+    /// Guarded to the user's Trash so a crafted entry can never make this delete a path
+    /// outside the Trash. Returns the count permanently removed.
+    @discardableResult
+    public func purge(_ entries: [DeletionEntry]) -> Int {
+        var purged = 0
         for entry in entries {
-            guard let trashed = entry.trashedPath else { continue }
-            try? fileManager.removeItem(at: URL(fileURLWithPath: trashed))
+            guard let trashed = entry.trashedPath, isInsideTrash(trashed) else { continue }
+            if (try? fileManager.removeItem(at: URL(fileURLWithPath: trashed))) != nil {
+                purged += 1
+            }
         }
+        return purged
+    }
+
+    /// True only when `path` is the user's Trash or a descendant of it. Dusty operates on the
+    /// boot volume, where `trashItem` lands files in `~/.Trash`, so that is the trusted boundary.
+    private func isInsideTrash(_ path: String) -> Bool {
+        let trash = (fileManager.homeDirectoryForCurrentUser.path as NSString).appendingPathComponent(".Trash")
+        let standardized = (path as NSString).standardizingPath
+        return standardized == trash || standardized.hasPrefix(trash + "/")
     }
 
     // MARK: - External commands
@@ -434,7 +458,10 @@ public final class CleanerEngine: @unchecked Sendable {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: docker)
-        process.arguments = ["system", "prune", "-af", "--volumes"]
+        // Prune unused images, build cache, stopped containers and networks. We
+        // intentionally omit `--volumes`: anonymous volumes routinely hold real
+        // data (databases, uploads, dev state) that cannot be re-downloaded.
+        process.arguments = ["system", "prune", "-af"]
         let pipe = Pipe()
         let errPipe = Pipe()
         process.standardOutput = pipe

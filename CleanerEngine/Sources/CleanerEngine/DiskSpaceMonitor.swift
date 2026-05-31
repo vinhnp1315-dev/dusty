@@ -1,6 +1,8 @@
 import Foundation
 
-public struct DiskSpaceMonitor: Sendable {
+/// `@unchecked Sendable`: the only stored reference is `FileManager`, used purely for
+/// delegate-free, concurrency-safe volume queries, so sharing across tasks is safe.
+public struct DiskSpaceMonitor: @unchecked Sendable {
     private let fileManager: FileManager
 
     public init(fileManager: FileManager = .default) {

@@ -15,6 +15,7 @@ set -euo pipefail
 
 REPO_URL="https://github.com/yagcioglutoprak/dusty.git"
 REF="${DUSTY_REF:-main}"
+REF_EXPLICIT="${DUSTY_REF:+yes}"   # non-empty only when the user set DUSTY_REF
 PREFIX="${DUSTY_PREFIX:-/Applications}"
 APP_NAME="Dusty.app"
 
@@ -63,9 +64,16 @@ WORK="$(mktemp -d -t dusty)"
 trap 'rm -rf "$WORK"' EXIT
 
 say "fetching source (${REF})"
-git clone --depth 1 --branch "$REF" "$REPO_URL" "$WORK/dusty" >/dev/null 2>&1 \
-  || git clone --depth 1 "$REPO_URL" "$WORK/dusty" >/dev/null 2>&1 \
-  || die "could not clone $REPO_URL"
+if [ -n "${REF_EXPLICIT:-}" ]; then
+  # An explicitly requested DUSTY_REF must resolve. Do not silently build a
+  # different ref: a typo should fail loudly, not install something unexpected.
+  git clone --depth 1 --branch "$REF" "$REPO_URL" "$WORK/dusty" >/dev/null 2>&1 \
+    || die "could not fetch ref '$REF' (set via DUSTY_REF). Check the name, or unset DUSTY_REF to build the default branch."
+else
+  git clone --depth 1 --branch "$REF" "$REPO_URL" "$WORK/dusty" >/dev/null 2>&1 \
+    || git clone --depth 1 "$REPO_URL" "$WORK/dusty" >/dev/null 2>&1 \
+    || die "could not clone $REPO_URL"
+fi
 
 cd "$WORK/dusty/Dusty"
 
@@ -101,17 +109,54 @@ BUILT="$DERIVED/Build/Products/Release/$APP_NAME"
 [ -d "$BUILT" ] || die "build finished but $APP_NAME was not found"
 
 # Install --------------------------------------------------------------------
+#
+# Stage the freshly built app beside the destination on the same volume, then
+# swap it into place. The previous install is kept as a backup until the new
+# copy is confirmed, so a failed copy never leaves you without a working app.
 
 DEST="$PREFIX/$APP_NAME"
-if [ -d "$DEST" ]; then
-  say "replacing existing install at $DEST"
-  rm -rf "$DEST"
-fi
+STAGING="$PREFIX/.dusty-install-$$.app"
+BACKUP="$PREFIX/.dusty-backup-$$.app"
+
+_sudo_noted=""
+run_priv() {
+  # Run a filesystem command, retrying once with sudo if it fails (e.g. /Applications needs admin).
+  if "$@" 2>/dev/null; then
+    return 0
+  fi
+  if [ -z "$_sudo_noted" ]; then
+    say "writing to $PREFIX needs admin rights"
+    _sudo_noted=1
+  fi
+  sudo "$@"
+}
+
+# Clean up staging/backup on any exit, in addition to the build dir.
+cleanup_install() { run_priv rm -rf "$STAGING" "$BACKUP" >/dev/null 2>&1 || true; }
+trap 'cleanup_install; rm -rf "$WORK"' EXIT
 
 say "installing to $PREFIX"
-if ! ditto "$BUILT" "$DEST" 2>/dev/null; then
-  say "writing to $PREFIX needs admin rights"
-  sudo ditto "$BUILT" "$DEST"
+run_priv rm -rf "$STAGING"
+if ! run_priv ditto "$BUILT" "$STAGING"; then
+  run_priv rm -rf "$STAGING"
+  die "could not stage the new build in $PREFIX"
+fi
+[ -d "$STAGING" ] || die "build staged but $STAGING is missing"
+
+if [ -d "$DEST" ]; then
+  say "replacing existing install at $DEST"
+  run_priv rm -rf "$BACKUP"
+  run_priv mv "$DEST" "$BACKUP"
+fi
+
+if run_priv mv "$STAGING" "$DEST"; then
+  run_priv rm -rf "$BACKUP"
+else
+  if [ -d "$BACKUP" ]; then
+    run_priv mv "$BACKUP" "$DEST"
+    die "could not install to $DEST; the previous version was restored"
+  fi
+  die "could not install to $DEST"
 fi
 
 # Locally built apps are not quarantined, but strip the flag just in case.

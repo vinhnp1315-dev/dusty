@@ -8,11 +8,13 @@ public protocol DeletionLogStore: Sendable {
 
 public final class FileDeletionLogStore: DeletionLogStore, @unchecked Sendable {
     public let logFileURL: URL
+    private let fileManager: FileManager
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     private let queue = DispatchQueue(label: "sh.toprak.dusty.deletion-log")
 
     public init(fileManager: FileManager = .default) {
+        self.fileManager = fileManager
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dir = appSupport.appendingPathComponent("Dusty", isDirectory: true)
         try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -59,6 +61,4 @@ public final class FileDeletionLogStore: DeletionLogStore, @unchecked Sendable {
             }
         }
     }
-
-    private var fileManager: FileManager { .default }
 }

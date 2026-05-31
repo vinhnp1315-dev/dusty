@@ -78,14 +78,17 @@ delete. It enforces:
   There is no "delete everything except" logic anywhere in the codebase.
 - **Protected folders are off limits.** Documents, Desktop, Pictures, Photos
   library, Music, Movies, Mail, iCloud Drive, Keychains, and Application Support
-  (except two named browser cache paths) are rejected even as prefixes.
+  (except one named browser cache path) are rejected even as prefixes.
 - **No symlink escapes.** Symlinks are never followed, so a delete cannot walk
   out of an allowed directory.
 - **Boot volume only.** Operations are confined to the volume your home folder
-  lives on. No `sudo`, no SIP-protected system paths.
+  lives on, and Dusty never runs as root or uses `sudo`. The only paths outside
+  your home folder are the Deep level's system diagnostic logs under
+  `/Library/Logs`, which need Full Disk Access. Nothing SIP-protected is touched.
 - **Dry run.** Flip one toggle to scan and report without removing a thing.
-- **Move to Trash and undo.** Developer and Deep deletes can go to the Trash, and
-  there is an undo window right after a clean.
+- **Move to Trash and undo.** Safe cleans move to the Trash with a brief undo
+  window right after, then the space is reclaimed. Developer and Deep cleans can
+  also be sent to the Trash so you can recover them there yourself.
 - **A written record.** Every action (timestamp, path, bytes) is appended to
   `~/Library/Application Support/Dusty/deletion-log.jsonl`.
 

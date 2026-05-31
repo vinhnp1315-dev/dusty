@@ -157,7 +157,7 @@ final class DustyViewModel: ObservableObject {
         lastDeletionResult = nil
         let engine = self.engine
         Task {
-            await Task.detached { engine.restore(entries) }.value
+            _ = await Task.detached { engine.restore(entries) }.value
             self.refreshFreeSpace()
             await self.rescan(level: .safe, settings: AppSettings.shared)
         }
@@ -182,7 +182,7 @@ final class DustyViewModel: ObservableObject {
         bannerStyle = .reclaimed
         let engine = self.engine
         Task {
-            await Task.detached { engine.purge(entries) }.value
+            _ = await Task.detached { engine.purge(entries) }.value
             self.refreshFreeSpace()
         }
     }

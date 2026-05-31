@@ -14,18 +14,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Releases are signed and notarized only when the signing secrets are
-      # present. Without them this job no-ops and stays green, so tags pushed
-      # before you finish docs/SIGNING.md do not fail. See docs/SIGNING.md.
+      # Releases are signed and notarized when the signing secrets are present.
+      # When they are absent the job FAILS, so a tag never looks successful
+      # without artifacts. To allow an intentional no-op (e.g. while bootstrapping
+      # before docs/SIGNING.md is done), set repository variable
+      # ALLOW_UNSIGNED_RELEASE_SKIP=true. See docs/SIGNING.md.
       - id: check
         env:
           CERT: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          ALLOW_SKIP: ${{ vars.ALLOW_UNSIGNED_RELEASE_SKIP }}
         run: |
           if [ -n "$CERT" ]; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "$ALLOW_SKIP" = "true" ]; then
             echo "ok=false" >> "$GITHUB_OUTPUT"
-            echo "No signing secrets configured. Skipping signed release."
+            echo "No signing secrets, and ALLOW_UNSIGNED_RELEASE_SKIP=true. Skipping signed release."
+          else
+            echo "::error::No signing secrets configured (MACOS_CERT_P12_BASE64). Configure signing/notarization secrets, or set repository variable ALLOW_UNSIGNED_RELEASE_SKIP=true to allow an intentional no-op release. See docs/SIGNING.md."
+            exit 1
           fi
 
       - name: Import Developer ID certificate
